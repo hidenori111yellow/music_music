@@ -97,26 +97,26 @@ class HolderState extends State<Holder> {
 
   @override
   Widget build(BuildContext context) {
-    return ReorderableList(
-      onReorder: this._reorderCallback,
-      onReorderDone: this._reorderDone,
-      child: ListView.builder(
-          // separatorBuilder: (context, index) => Divider(
-          //       color: Colors.black,
-          //     ),
-          itemCount: widget.files.length,
-          itemBuilder: (context, index) {
-            return HolderItem(
-              data: _fileItems[index],
-              isFirst: index == 0,
-              isLast: index == _fileItems.length - 1,
-              draggingMode: _draggingMode,
-              flutterSound: flutterSound,
-              beforeTaped: beforeTaped,
-              file: Store.files[index],
-              beforTapedCallback: (val) => setState(() => beforeTaped = val),
-            );
-          }),
+    return Padding(
+      padding: const EdgeInsets.only(top: 16.0, bottom: 80.0),
+      child: ReorderableList(
+        onReorder: this._reorderCallback,
+        onReorderDone: this._reorderDone,
+        child: ListView.builder(
+            itemCount: widget.files.length,
+            itemBuilder: (context, index) {
+              return HolderItem(
+                data: _fileItems[index],
+                isFirst: index == 0,
+                isLast: index == _fileItems.length - 1,
+                draggingMode: _draggingMode,
+                flutterSound: flutterSound,
+                beforeTaped: beforeTaped,
+                file: Store.files[index],
+                beforTapedCallback: (val) => setState(() => beforeTaped = val),
+              );
+            }),
+      ),
     );
   }
 }

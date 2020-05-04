@@ -2,17 +2,24 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:font_awesome_flutter/font_awesome_flutter.dart';
+import 'package:path/path.dart' as path;
 import 'package:path_provider/path_provider.dart';
 import 'package:webview_flutter/webview_flutter.dart';
-import 'package:youtube_explode_dart/youtube_explode_dart.dart';
+import 'package:youtube_explode_dart/youtube_explode_dart.dart' as exploder;
 import 'package:audioplayers/audio_cache.dart';
 import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter_sound/flutter_sound.dart';
-import 'package:music_music/pages/loading_page.dart';
 
+import 'package:music_music/pages/loading_page.dart';
 import 'package:music_music/store.dart';
 import 'package:music_music/pages/holder_page.dart';
 import 'package:music_music/pages/web_page.dart';
+import 'package:music_music/actions/download.dart';
+
+typedef void WebControllerCallback(Completer<WebViewController> controller);
+
+typedef void DisposeCallback();
 
 List<BottomNavigationBarItem> bottomItems = [home(), holder(), web()];
 
@@ -22,7 +29,7 @@ BottomNavigationBarItem home() {
 
 BottomNavigationBarItem holder() {
   return BottomNavigationBarItem(
-      icon: Icon(Icons.list), title: Text("MySongs"));
+      icon: Icon(FontAwesomeIcons.music), title: Text("MySongs"));
 }
 
 BottomNavigationBarItem web() {
@@ -30,8 +37,6 @@ BottomNavigationBarItem web() {
 }
 
 var _contentIndex = 0;
-
-final yt = YoutubeExplode();
 
 FlutterSound flutterSound = FlutterSound();
 
@@ -49,6 +54,8 @@ class _DownloadExampleState extends State<DownloadExample> {
 
   PageController _pageController =
       PageController(initialPage: 0, keepPage: true);
+
+  Completer<WebViewController> _controller = Completer<WebViewController>();
 
   @override
   void initState() {
@@ -84,14 +91,101 @@ class _DownloadExampleState extends State<DownloadExample> {
 
   void createDirectory() {}
 
+  void animateToPage(int index) {
+    _pageController.animateToPage(index,
+        duration: Duration(milliseconds: 300), curve: Curves.easeOutCirc);
+    _contentIndex = index;
+  }
+
+  Widget homeWiget() {
+    return Container(
+      decoration: BoxDecoration(
+        image: DecorationImage(
+            image: AssetImage('assets/images/music_notes3.jpg'),
+            // colorFilter: new ColorFilter.mode(
+            //     Colors.black.withOpacity(0.7), BlendMode.dstATop),
+            fit: BoxFit.cover),
+      ),
+      child: Center(),
+    );
+  }
+
+  Widget holderWiget(List<FileSystemEntity> files) {
+    return Holder(
+      files: files,
+    );
+  }
+
+  Widget webWidget() {
+    return WebPage(
+      controller: _controller,
+      webControllerCallback: (val) => _controller = val,
+      disposeCallback: () => _controller = Completer<WebViewController>(),
+    );
+  }
+
+  FutureBuilder<WebViewController> _downloadButton(
+      Completer<WebViewController> controller) {
+    return FutureBuilder<WebViewController>(
+      future: controller.future,
+      builder:
+          (BuildContext context, AsyncSnapshot<WebViewController> controller) {
+        if (controller.hasData) {
+          return InkWell(
+            child: Padding(
+              padding: const EdgeInsets.all(10.0),
+              child: Icon(Icons.file_download),
+            ),
+            onTap: () {
+              controller.data.currentUrl().then((url) {
+                print(url);
+                Download(url);
+              });
+              // getInfo(url);
+            },
+          );
+        }
+        return Container();
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     if (Store.isLoading) return LoadingPage();
 
     return Scaffold(
+      appBar: AppBar(
+        centerTitle: true,
+        title: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: <Widget>[
+            Padding(
+              padding: const EdgeInsets.only(left: 28.0),
+              child: InkWell(
+                child: Text(
+                  "Music Music",
+                  style: TextStyle(color: Colors.yellow),
+                ),
+                onTap: () => animateToPage(0),
+              ),
+            ),
+            Icon(
+              Icons.music_note,
+              color: Colors.pinkAccent,
+            )
+          ],
+        ),
+        actions: <Widget>[
+          (_contentIndex == 2) ? _downloadButton(_controller) : Container(),
+        ],
+      ),
       body: PageView(
         controller: _pageController,
-        onPageChanged: (val) => setState(() => _contentIndex = val),
+        physics: (_contentIndex != 2)
+            ? PageScrollPhysics()
+            : NeverScrollableScrollPhysics(),
+        onPageChanged: (index) => setState(() => _contentIndex = index),
         children: <Widget>[
           homeWiget(),
           holderWiget(files),
@@ -102,120 +196,13 @@ class _DownloadExampleState extends State<DownloadExample> {
         items: bottomItems,
         onTap: (index) {
           setState(() {
-            _pageController.animateToPage(index,
-                duration: Duration(milliseconds: 300),
-                curve: Curves.easeOutCirc);
-            _contentIndex = index;
+            animateToPage(index);
           });
         },
         currentIndex: _contentIndex,
       ),
     );
   }
-}
-
-Widget homeWiget() {
-  return Center(
-    child: Column(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: <Widget>[
-        InkWell(
-          child: Text(
-            "download",
-            style: TextStyle(color: Colors.black),
-          ),
-          onTap: () {
-            print("download");
-            // holderKey.currentState.setState(() {
-            getInfo();
-            // });
-          },
-        ),
-        Padding(
-          padding: const EdgeInsets.all(30.0),
-          child: InkWell(
-              child: Text(
-                "onStart",
-                style: TextStyle(color: Colors.black),
-              ),
-              onTap: () {
-                print("onStart");
-                onStart();
-              }),
-        ),
-        Padding(
-          padding: const EdgeInsets.all(30.0),
-          child: InkWell(
-              child: Text(
-                "onStop",
-                style: TextStyle(color: Colors.black),
-              ),
-              onTap: () {
-                print("onStop");
-                onStop();
-              }),
-        ),
-        Padding(
-          padding: const EdgeInsets.all(30.0),
-          child: InkWell(
-              child: Text(
-                "onPause",
-                style: TextStyle(color: Colors.black),
-              ),
-              onTap: () {
-                print("onPause");
-                onPause();
-              }),
-        ),
-        Padding(
-          padding: const EdgeInsets.all(30.0),
-          child: InkWell(
-              child: Text(
-                "onResume",
-                style: TextStyle(color: Colors.black),
-              ),
-              onTap: () {
-                print("onResume");
-                onResume();
-              }),
-        ),
-        Padding(
-          padding: const EdgeInsets.all(30.0),
-          child: InkWell(
-              child: Text(
-                "seekToPlay",
-                style: TextStyle(color: Colors.black),
-              ),
-              onTap: () {
-                print("seekToPlay");
-                Duration dur = Duration(seconds: 30);
-                seekToPlay(dur.inMilliseconds);
-              }),
-        ),
-        Padding(
-          padding: const EdgeInsets.all(30.0),
-          child: InkWell(
-              child: Text(
-                "here",
-                style: TextStyle(color: Colors.black),
-              ),
-              onTap: () {
-                print("here");
-              }),
-        ),
-      ],
-    ),
-  );
-}
-
-Widget holderWiget(List<FileSystemEntity> files) {
-  return Holder(
-    files: files,
-  );
-}
-
-Widget webWidget() {
-  return WebPage();
 }
 
 Future<void> onStart() async {
@@ -261,94 +248,6 @@ Future<void> seekToPlay(int sec) async {
   result.then((v) {
     print('seekToPlayer: $v');
   });
-}
-
-Future<void> getInfo() async {
-  // var url = "https://www.youtube.com/watch?v=5nmxDZSokzE";
-  // var url = "https://www.youtube.com/watch?v=JGwWNGJdvx8";
-  // var url = "https://www.youtube.com/watch?v=eq8r1ZTma08";
-  // var url = "https://www.youtube.com/watch?v=WFsWrsQZgrA";
-  // var url = "https://www.youtube.com/watch?v=_-q-wUB2H1U";
-  var url = "https://www.youtube.com/watch?v=Bp9-Yh6tb68";
-
-  var id = YoutubeExplode.parseVideoId(url);
-  print(id);
-  if (id == null) {
-    print("id is null");
-  }
-
-  Directory appDocDirectory = await getApplicationDocumentsDirectory();
-
-  Directory downloadsDirectory = Directory('${appDocDirectory.path}/downloads');
-
-  downloadsDirectory.createSync();
-
-  // Download the video.
-  if (id != null) {
-    await download(id);
-  }
-}
-
-Future<void> download(String id) async {
-  // Get the video media stream.
-  var mediaStream = await yt.getVideoMediaStream(id);
-
-  // Get the last audio track (the one with the highest bitrate).
-  var audio = mediaStream.audio.last;
-
-  // Compose the file name removing the unallowed characters in windows.
-  var fileName =
-      '${mediaStream.videoDetails.title}.${audio.container.toString()}'
-          .replaceAll('Container.', '')
-          .replaceAll(r'\', '')
-          .replaceAll('/', '')
-          .replaceAll('*', '')
-          .replaceAll('?', '')
-          .replaceAll('"', '')
-          .replaceAll('<', '')
-          .replaceAll('>', '')
-          .replaceAll('|', '');
-
-  Directory appDocDirectory = await getApplicationDocumentsDirectory();
-
-  print('${appDocDirectory.path}/downloads/$fileName');
-
-  var file = File('${appDocDirectory.path}/downloads/$fileName');
-
-  // Open the file in appendMode.
-  var output = file.openWrite(mode: FileMode.writeOnlyAppend);
-
-  // Track the file download status.
-  var len = audio.size;
-  var count = 0;
-  var oldProgress = -1;
-
-  // Create the message and set the cursor position.
-  var msg = 'Downloading `${mediaStream.videoDetails.title}`:  \n';
-  print(msg);
-
-  print(audio.audioEncoding);
-
-  await Future.delayed(Duration(seconds: 10));
-
-  // Listen for data received.
-  await for (var data in audio.downloadStream()) {
-    count += data.length;
-    var progress = ((count / len) * 100).round();
-    if (progress != oldProgress) {
-      print('$progress%');
-      oldProgress = progress;
-    }
-    output.add(data);
-  }
-
-  // await for (var i in audio.downloadStream()) {
-  //   print("$i");
-  // }
-
-  print("there");
-
-  await output.close();
 }
 
 Future<String> get _localPath async {
